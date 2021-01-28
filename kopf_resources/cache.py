@@ -28,9 +28,9 @@ class ResourceCache():
 
     __kopf_decorators__ = {
         'add': (
-            'resume',
             'create',
             'update',
+            'resume',
         ),
         'remove': (
             'delete',
@@ -54,7 +54,7 @@ class ResourceCache():
                     def wrapper(*args, **kwargs):
                         return operation_handler(*args, **kwargs)
 
-                    return handler(wrapper)
+                    handler(wrapper)
 
             operation_handler = getattr(self, operation_name)
             bind_handler(operation_handler, decorator_names)
