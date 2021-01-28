@@ -3,3 +3,9 @@ from .resources import (
     Spec,
     Status,
 )
+
+from .cache import (
+    ResourceCache,
+    ResourceNotFound,
+)
+
