@@ -1,11 +1,8 @@
-import functools
 import logging
-
-from pydantic.typing import Dict
 
 import kopf
 
-from .resources import Resource
+from .resources import DecoratorWrapper, Resource
 
 
 log = logging.getLogger('kopf_resources')
@@ -19,6 +16,7 @@ class ResourceNotFound(Exception):
 
 class ResourceCache():
     """Automagic resource cache.
+
     If resources are created or updated they are added to the cache.
     If resources are deleted they are removed from the cache.
 
@@ -26,38 +24,20 @@ class ResourceCache():
     instance = mycache.get(resource_name, namespace=namespace)
     """
 
-    __kopf_decorators__ = {
-        'add': (
-            'create',
-            'update',
-            'resume',
-        ),
-        'remove': (
-            'delete',
-        )
-    }
-
-
     def __init__(self, resource_definition: Resource):
         self.resource_definition = resource_definition
         self.__cache = {}
 
         crd = self.resource_definition
         args = (crd.__group__, crd.__version__, crd.__plural__)
-        for operation_name, decorator_names in self.__kopf_decorators__.items():
-            def bind_handler(operation_handler, decorator_names):
-                for name in decorator_names:
-                    kopf_decorator = getattr(kopf.on, name)
-                    handler = kopf_decorator(*args)
 
-                    @functools.wraps(operation_handler)
-                    def wrapper(*args, **kwargs):
-                        return operation_handler(*args, **kwargs)
+        # Decorate this resource cache's add method with resource handlers.
+        self.add = DecoratorWrapper('create', args)(self.add)
+        self.add = DecoratorWrapper('update', args)(self.add)
+        self.add = DecoratorWrapper('resume', args)(self.add)
 
-                    handler(wrapper)
-
-            operation_handler = getattr(self, operation_name)
-            bind_handler(operation_handler, decorator_names)
+        # Decorate this resource cache's remove method with resource handlers.
+        self.remove = DecoratorWrapper('delete', args)(self.remove)
 
 
     def add(self, body, **_):

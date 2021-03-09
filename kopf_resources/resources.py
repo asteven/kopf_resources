@@ -36,19 +36,61 @@ def dereference_schema(schema, definitions, parent=None, key=None):
 
 
 class DecoratorWrapper():
-    """A class that wrapps a kopf rource handling decorator
-    and injects the resource specific parameters so users don't have to.
+    """A class that wrapps a kopf resource handling decorator.
+
+    It injects the resource specific parameters so users don't have to.
+
+    It can be used as a descriptor on a class as done with the DecoratorProxy
+    class below.
+
+    Alternatively it can be used explicitly by passing the kopf decorator name
+    and the required resource parameters to the constructor. An example of this
+    usage is available in the ResourceCache class which is part of this package.
+
+    e.g.
+    ```
+        def func(*args):
+            pass
+
+        decorator = DecoratorWrapper('create', ('example.com', 'v1', 'myresources')
+        func = decorator(func)
+    ```
     """
 
+    def __init__(self, name=None, args=None):
+        # This method is only used in explicit/manual mode.
+        self.name = name
+        self.args = args
+
+
+    def __call__(self, func):
+        # This method is only used in explicit/manual mode.
+        return self.decorator(func)
+
+
     def __set_name__(self, owner, name):
+        # This method is only used in descriptor mode.
+
         # Store the name of this decorator wrapper so we can call the
         # apropriate kopf decorator later on.
         self.name = name
 
 
+    def __get__(self, instance, owner):
+        # This method is only used in descriptor mode.
+        print(f'DecoratorWrapper.__get__: {instance}, {owner}')
+        resource = instance.owner
+        self.args = (resource.__group__, resource.__version__, resource.__plural__)
+        return self.decorator
+
+
     def decorator(self, *args, **kwargs):
+        """Decorator function that uses the name and resource specific
+        parameters available to this class to wrap the corresponding
+        kopf.on.$name decorator.
+        """
         #print(f'DecoratorWrapper.decorator: {self.name}: {args}, {kwargs}')
-        if len(args) == 1 and isinstance(args[0], types.FunctionType):
+        if len(args) == 1 and callable(args[0]):
             # Used as:
             # @SomeResource.on.create
             # def some_function(*args, **kwargs):
@@ -93,10 +135,6 @@ class DecoratorWrapper():
         return handler(wrapper)
 
 
-    def __get__(self, instance, owner):
-        resource = instance.owner
-        self.args = (resource.__group__, resource.__version__, resource.__plural__)
-        return self.decorator
 
 
 
