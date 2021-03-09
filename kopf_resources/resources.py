@@ -216,6 +216,7 @@ class Resource(BaseModel, DecoratorMixin):
         cls.__version__ = version
         cls.__status_subresource__ = status_subresource
         cls.__plural__ = plural = kwargs.get('plural', f'{name.lower()}s')
+        cls.__fqname__ = f'{cls.__plural__}.{cls.__group__}'
         cls.__spec__ = {
             'group': group,
             'names': {
@@ -242,7 +243,7 @@ class Resource(BaseModel, DecoratorMixin):
         body = {
             'apiVersion': 'apiextensions.k8s.io/v1',
             'kind': 'CustomResourceDefinition',
-            'metadata': {'name': f'{plural_name}.{group}'},
+            'metadata': {'name': cls.__fqname__},
             'spec': spec,
         }
 
