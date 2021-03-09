@@ -78,7 +78,6 @@ class DecoratorWrapper():
 
     def __get__(self, instance, owner):
         # This method is only used in descriptor mode.
-        print(f'DecoratorWrapper.__get__: {instance}, {owner}')
         resource = instance.owner
         self.args = (resource.__group__, resource.__version__, resource.__plural__)
         return self.decorator
@@ -89,7 +88,6 @@ class DecoratorWrapper():
         parameters available to this class to wrap the corresponding
         kopf.on.$name decorator.
         """
-        #print(f'DecoratorWrapper.decorator: {self.name}: {args}, {kwargs}')
         if len(args) == 1 and callable(args[0]):
             # Used as:
             # @SomeResource.on.create
