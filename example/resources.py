@@ -54,6 +54,25 @@ class HostCertificate(Resource, group='ssh-cert-manager.io', version='v1', scope
 
 
 
+# Demonstrate support for multiple versions
+class HostCertificateSpecV1alpha2(Spec):
+    secretName: str
+    issuerRef: IssuerRef
+    principals: List[str] = Field(default_factory=list, description='List of principals to add to the certificate. Defaults to the name of the HostCertificate.')
+    keyTypes: List[str] = Field(default_factory=list)
+
+    # extensions and criticalOptions did not exist in v1alpha2 version
+    #extensions: Dict[str,str] = Field(default_factory=dict)
+    #criticalOptions: Dict[str,str] = Field(default_factory=dict)
+
+
+class HostCertificateV1alpha2(Resource, kind='HostCertificate', group='ssh-cert-manager.io', version='v1alpha2', scope='Namespaced', storage=False):
+    spec: HostCertificateSpecV1alpha2
+
+
+
+
+
 def get_subclasses(cls):
     for subclass in cls.__subclasses__():
         yield from get_subclasses(subclass)
