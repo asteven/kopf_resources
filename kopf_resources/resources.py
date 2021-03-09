@@ -35,66 +35,98 @@ def dereference_schema(schema, definitions, parent=None, key=None):
 
 
 
-class DecoratorProxy():
-    """A configurable decorator proxy.
+class DecoratorWrapper():
+    """A class that wrapps a kopf rource handling decorator
+    and injects the resource specific parameters so users don't have to.
     """
-    __kopf_decorators__ = (
-        'resume',
-        'create',
-        'update',
-        'delete',
-        'field',
-        'event',
-        'daemon',
-        'timer'
-    )
-    def __init__(self, group, version, plural):
-        self.args = (group, version, plural)
 
-    def __getattr__(self, name):
-        """Proxy to curated list of kopf decorators.
-        """
-        if name in self.__kopf_decorators__:
-            kopf_decorator = getattr(kopf.on, name)
-            def decorator(*args, **kwargs):
-                if len(args) == 1 and isinstance(args[0], types.FunctionType):
-                    # Used as:
-                    # @SomeResource.on.create
-                    # def some_function(*args, **kwargs):
-                    #     pass
-                    func = args[0]
-                    d_args = kwargs.get('__args', self.args)
-                    d_kwargs = kwargs.get('__kwargs', {})
-                else:
-                    # Used as:
-                    # @SomeResource.on.create(when=some_filter, labels=...)
-                    # def some_function(*args, **kwargs):
-                    #     pass
+    def __set_name__(self, owner, name):
+        # Store the name of this decorator wrapper so we can call the
+        # apropriate kopf decorator later on.
+        self.name = name
 
-                    # Inject our own args to tell kopf about our resource.
-                    all_args = self.args + args
-                    return functools.partial(decorator, __args=all_args, __kwargs=kwargs)
 
-                handler = kopf_decorator(*d_args, **d_kwargs)
+    def decorator(self, *args, **kwargs):
+        #print(f'DecoratorWrapper.decorator: {self.name}: {args}, {kwargs}')
+        if len(args) == 1 and isinstance(args[0], types.FunctionType):
+            # Used as:
+            # @SomeResource.on.create
+            # def some_function(*args, **kwargs):
+            #     pass
+            func = args[0]
+            d_args = kwargs.get('__args', self.args)
+            d_kwargs = kwargs.get('__kwargs', {})
+        else:
+            # Used as:
+            # @SomeResource.on.create(when=some_filter, labels=...)
+            # def some_function(*args, **kwargs):
+            #     pass
 
-                signature = inspect.signature(func)
-                type_hints = typing.get_type_hints(func)
-                #print('     signature: %s' % signature)
-                #print('     type_hints: %s' % type_hints)
+            # Inject our resource specific args to comply with kopf's decorator
+            # signatures.
+            all_args = self.args + args
+            return functools.partial(self.decorator, __args=all_args, __kwargs=kwargs)
 
-                @functools.wraps(func)
-                def wrapper(*args, **kwargs):
-                    # Wrapper function that parses pydantic models based on
-                    # typing hints.
-                    #print('     wrapper: %s; %s' % (args, kwargs))
-                    for argument_name, argument_type in type_hints.items():
-                        if issubclass(argument_type, BaseModel):
-                            _object = kwargs[argument_name]
-                            kwargs[argument_name] = argument_type.parse_obj(_object)
-                    return func(*args, **kwargs)
-                return handler(wrapper)
 
-            return decorator
+        #print(f'name: {self.name}')
+        #print(f'     func: {func}')
+        #print(f'     d_args: {d_args}')
+        #print(f'     d_kwargs: {d_kwargs}')
+        kopf_decorator = getattr(kopf.on, self.name)
+        handler = kopf_decorator(*d_args, **d_kwargs)
+        signature = inspect.signature(func)
+        type_hints = typing.get_type_hints(func)
+        #print('     signature: %s' % signature)
+        #print('     type_hints: %s' % type_hints)
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            # Wrapper function that parses pydantic models based on
+            # typing hints.
+            #print('     wrapper: %s; %s' % (args, kwargs))
+            for argument_name, argument_type in type_hints.items():
+                if issubclass(argument_type, BaseModel):
+                    _object = kwargs[argument_name]
+                    kwargs[argument_name] = argument_type.parse_obj(_object)
+
+            return func(*args, **kwargs)
+        return handler(wrapper)
+
+
+    def __get__(self, instance, owner):
+        resource = instance.owner
+        self.args = (resource.__group__, resource.__version__, resource.__plural__)
+        return self.decorator
+
+
+
+class DecoratorProxy():
+    """Descriptor class that dispatches decorators to kopf.on.$name.
+    """
+
+    def __get__(self, instance, owner):
+        # Store a reference to the Resource subclass we are used on.
+        # This is used in the DecoratorWrapper instances to access
+        # the __kind__, __group__ and __plural__ members of the resource.
+        self.owner = owner
+        return self
+
+    resume = DecoratorWrapper()
+    create = DecoratorWrapper()
+    update = DecoratorWrapper()
+    delete = DecoratorWrapper()
+    field = DecoratorWrapper()
+    event = DecoratorWrapper()
+    daemon = DecoratorWrapper()
+    timer = DecoratorWrapper()
+
+
+
+class DecoratorMixin():
+    """Sugar to let the decorator proxy be used as a mixin base class.
+    """
+
+    on = DecoratorProxy()
 
 
 
@@ -125,12 +157,16 @@ class Status(BaseModel):
 
 
 
-class Resource(BaseModel):
+class Resource(BaseModel, DecoratorMixin):
     __spec__ = None
     __group__ = None
     __version__ = None
     __kwargs__ = None
     __status_subresource__ = False
+
+    # This would also work instead of inheriting from the DecoratorMixin
+    # base class.
+    #on = DecoratorProxy()
 
     def __init_subclass__(cls, /, group, version, scope='Namespaced',
             status_subresource=False, **kwargs):
@@ -149,7 +185,6 @@ class Resource(BaseModel):
             },
             'scope': scope,
         }
-        cls.on = DecoratorProxy(group, version, plural)
 
     apiVersion: str
     kind: str
