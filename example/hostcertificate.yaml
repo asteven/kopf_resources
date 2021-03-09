@@ -1,0 +1,19 @@
+apiVersion: ssh-cert-manager.io/v1
+kind: HostCertificate
+metadata:
+  name: example-ssh-server
+  namespace: default
+spec:
+  principals:
+  - example-ssh-server
+  - ssh-server.example.com
+  - other-name.example.com
+  issuerRef:
+    kind: Issuer
+    name: ssh-host-signer
+  keyTypes:
+  - rsa
+  - ed25519
+  #ttl: 24h
+  secretName: my-ssh-host-keys
+

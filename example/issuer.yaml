@@ -1,0 +1,9 @@
+apiVersion: ssh-cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ssh-host-signer
+  namespace: default
+spec:
+  path: ssh-host-signer
+  server: http://127.0.0.1:8200
+  role: ssh-ca-admin
