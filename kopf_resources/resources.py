@@ -127,6 +127,9 @@ class DecoratorWrapper():
             # typing hints.
             #print('     wrapper: %s; %s' % (args, kwargs))
             for argument_name, argument_type in type_hints.items():
+                # NOTE: BaseModel is pydantic specific. Will need a way to
+                #       make this configurable if other datamodel packages
+                #       should be supported.
                 if issubclass(argument_type, BaseModel):
                     _object = kwargs[argument_name]
                     kwargs[argument_name] = argument_type.parse_obj(_object)
