@@ -137,8 +137,6 @@ class DecoratorWrapper():
 
 
 
-
-
 class DecoratorProxy():
     """Descriptor class that dispatches decorators to kopf.on.$name.
     """
@@ -198,11 +196,14 @@ class Status(BaseModel):
 
 
 class Resource(BaseModel, DecoratorMixin):
+    __kind__ = None
     __spec__ = None
     __group__ = None
     __version__ = None
     __kwargs__ = None
     __status_subresource__ = False
+
+    __resource_registry__ = {}
 
     # This would also work instead of inheriting from the DecoratorMixin
     # base class.
@@ -215,14 +216,18 @@ class Resource(BaseModel, DecoratorMixin):
         return cls.on.index(*args, **kwargs)
 
 
-    def __init_subclass__(cls, /, group, version, scope='Namespaced',
-            status_subresource=False, **kwargs):
-        name = cls.__name__
+    def __init_subclass__(cls, /, group, version, kind=None,
+            scope='Namespaced', status_subresource=False,
+            served=True, storage=True, **kwargs):
+        name = cls.__kind__ = kind or cls.__name__
         cls.__group__ = group
         cls.__version__ = version
         cls.__status_subresource__ = status_subresource
         cls.__plural__ = plural = kwargs.get('plural', f'{name.lower()}s')
         cls.__fqname__ = f'{cls.__plural__}.{cls.__group__}'
+        cls.__served__ = served
+        # TODO: only one version can be stored. Maybe validate that somehow?
+        cls.__storage__ = storage
         cls.__spec__ = {
             'group': group,
             'names': {
@@ -232,17 +237,28 @@ class Resource(BaseModel, DecoratorMixin):
                 'plural': plural
             },
             'scope': scope,
+            'versions': [],
         }
+        Resource.__resource_registry__.setdefault(cls.__fqname__, {})
+        Resource.__resource_registry__[cls.__fqname__][cls.__version__] = cls
+
 
     apiVersion: str
     kind: str
     metadata: ObjectMeta = None
 
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]) -> None:
+            # Don't want ObjectMeta in crd.
+            del schema['properties']['metadata']
+
+
     @classmethod
     def as_crd(cls):
         """Create and return a CustomResourceDefinition for this resource.
         """
-        name = cls.__name__
         spec = cls.__spec__.copy()
         group = spec['group']
         plural_name = spec['names']['plural']
@@ -253,25 +269,25 @@ class Resource(BaseModel, DecoratorMixin):
             'spec': spec,
         }
 
-        schema = cls.schema()
-        if 'definitions' in schema:
-            definitions = schema.pop('definitions')
-            dereference_schema(schema, definitions)
+        for version, resource_class in Resource.__resource_registry__[cls.__fqname__].items():
+            schema = resource_class.schema()
+            if 'definitions' in schema:
+                definitions = schema.pop('definitions')
+                dereference_schema(schema, definitions)
 
-        # Don't want ObjectMeta in crd.
-        del schema['properties']['metadata']
+            _version = {
+                'name': version,
+                'schema': {'openAPIV3Schema': schema},
+                'served': resource_class.__served__,
+                'storage': resource_class.__storage__,
+            }
 
-        # TODO: support different versions?
-        version = {
-            'name': cls.__version__,
-            'schema': {'openAPIV3Schema': schema},
-            'served': True,
-            'storage': True,
-        }
-        if cls.__status_subresource__:
-            version.setdefault('subresources', {})
-            version['subresources']['status'] = {}
-        body['spec']['versions'] = [version]
+            if resource_class.__status_subresource__:
+                _version.setdefault('subresources', {})
+                _version['subresources']['status'] = {}
+
+            body['spec']['versions'].append(_version)
+
         return body
 
 
