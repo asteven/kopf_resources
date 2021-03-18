@@ -78,6 +78,7 @@ class DecoratorWrapper():
 
     def __get__(self, instance, owner):
         # This method is only used in descriptor mode.
+        #print(f'DecoratorWrapper.__get__: {instance}, {owner}')
         resource = instance.owner
         self.args = (resource.__group__, resource.__version__, resource.__plural__)
         return self.decorator
@@ -194,6 +195,36 @@ class Status(BaseModel):
     pass
 
 
+class ResourceNotFoundError(Exception):
+    pass
+
+
+class ResourceRegistry():
+    __resource_registry__ = {}
+
+
+    @classmethod
+    def add(cls, fqname, version, resource_class):
+        cls.__resource_registry__.setdefault(fqname, {})
+        cls.__resource_registry__[fqname][version] = resource_class
+
+    @classmethod
+    def get(cls, fqname, version):
+        try:
+            return cls.__resource_registry__[fqname][version]
+        except KeyError as e:
+            msg = f'Could not find resource class for: {fqname}, {version}'
+            raise ResourceNotFoundError() from e
+
+    @classmethod
+    def iter_versions(cls, fqname):
+        try:
+            return iter(cls.__resource_registry__[fqname].items())
+        except KeyError as e:
+            msg = f'Could not find resource classes for: {fqname}'
+            raise ResourceNotFoundError() from e
+
+
 
 class Resource(BaseModel, DecoratorMixin):
     __kind__ = None
@@ -202,8 +233,6 @@ class Resource(BaseModel, DecoratorMixin):
     __version__ = None
     __kwargs__ = None
     __status_subresource__ = False
-
-    __resource_registry__ = {}
 
     # This would also work instead of inheriting from the DecoratorMixin
     # base class.
@@ -239,8 +268,7 @@ class Resource(BaseModel, DecoratorMixin):
             'scope': scope,
             'versions': [],
         }
-        Resource.__resource_registry__.setdefault(cls.__fqname__, {})
-        Resource.__resource_registry__[cls.__fqname__][cls.__version__] = cls
+        ResourceRegistry.add(cls.__fqname__, cls.__version__, cls)
 
 
     apiVersion: str
@@ -269,7 +297,7 @@ class Resource(BaseModel, DecoratorMixin):
             'spec': spec,
         }
 
-        for version, resource_class in Resource.__resource_registry__[cls.__fqname__].items():
+        for version, resource_class in ResourceRegistry.iter_versions(cls.__fqname__):
             schema = resource_class.schema()
             if 'definitions' in schema:
                 definitions = schema.pop('definitions')
