@@ -204,12 +204,24 @@ class ResourceRegistry():
 
 
     @classmethod
-    def add(cls, fqname, version, resource_class):
-        cls.__resource_registry__.setdefault(fqname, {})
-        cls.__resource_registry__[fqname][version] = resource_class
+    def add(cls, resource_class):
+        cls.__resource_registry__.setdefault(resource_class.__fqname__, {})
+        cls.__resource_registry__[resource_class.__fqname__][resource_class.__version__] = resource_class
+        # For easy access via (apiVersion, kind) tuple.
+        key = (resource_class.__api_version__, resource_class.__kind__)
+        cls.__resource_registry__[key] = resource_class
 
     @classmethod
-    def get(cls, fqname, version):
+    def get(cls, api_version, kind):
+        key = (api_version, kind)
+        try:
+            return cls.__resource_registry__[key]
+        except KeyError as e:
+            msg = f'Could not find resource class for: {key}'
+            raise ResourceNotFoundError() from e
+
+    @classmethod
+    def get_version(cls, fqname, version):
         try:
             return cls.__resource_registry__[fqname][version]
         except KeyError as e:
@@ -217,9 +229,9 @@ class ResourceRegistry():
             raise ResourceNotFoundError() from e
 
     @classmethod
-    def iter_versions(cls, fqname):
+    def iter_versions(cls, resource_class):
         try:
-            return iter(cls.__resource_registry__[fqname].items())
+            return iter(cls.__resource_registry__[resource_class.__fqname__].items())
         except KeyError as e:
             msg = f'Could not find resource classes for: {fqname}'
             raise ResourceNotFoundError() from e
@@ -231,6 +243,7 @@ class Resource(BaseModel, DecoratorMixin):
     __spec__ = None
     __group__ = None
     __version__ = None
+    __api_version__ = None
     __kwargs__ = None
     __status_subresource__ = False
 
@@ -251,6 +264,7 @@ class Resource(BaseModel, DecoratorMixin):
         name = cls.__kind__ = kind or cls.__name__
         cls.__group__ = group
         cls.__version__ = version
+        cls.__api_version__ = f'{cls.__group__}/{cls.__version__}'
         cls.__status_subresource__ = status_subresource
         cls.__plural__ = plural = kwargs.get('plural', f'{name.lower()}s')
         cls.__fqname__ = f'{cls.__plural__}.{cls.__group__}'
@@ -268,7 +282,7 @@ class Resource(BaseModel, DecoratorMixin):
             'scope': scope,
             'versions': [],
         }
-        ResourceRegistry.add(cls.__fqname__, cls.__version__, cls)
+        ResourceRegistry.add(cls)
 
 
     apiVersion: str
