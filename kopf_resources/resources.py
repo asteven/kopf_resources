@@ -258,8 +258,8 @@ class Resource(BaseModel, DecoratorMixin):
         return cls.on.index(*args, **kwargs)
 
 
-    @classmethod
-    def parse(cls, body):
+    @staticmethod
+    def parse(body):
         """Parse the given body dict into a resource instance.
         """
         resource_class = ResourceRegistry.get(body['apiVersion'], body['kind'])
