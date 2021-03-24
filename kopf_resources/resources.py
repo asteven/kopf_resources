@@ -158,6 +158,7 @@ class DecoratorProxy():
     event = DecoratorWrapper()
     daemon = DecoratorWrapper()
     timer = DecoratorWrapper()
+    index = DecoratorWrapper()
 
 
 
@@ -206,6 +207,13 @@ class Resource(BaseModel, DecoratorMixin):
     # This would also work instead of inheriting from the DecoratorMixin
     # base class.
     #on = DecoratorProxy()
+
+    @classmethod
+    def index(cls, *args, **kwargs):
+        """Sugar: `index` instead of `on.index`
+        """
+        return cls.on.index(*args, **kwargs)
+
 
     def __init_subclass__(cls, /, group, version, scope='Namespaced',
             status_subresource=False, **kwargs):
