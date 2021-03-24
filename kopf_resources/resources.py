@@ -258,6 +258,14 @@ class Resource(BaseModel, DecoratorMixin):
         return cls.on.index(*args, **kwargs)
 
 
+    @classmethod
+    def parse(cls, body):
+        """Parse the given body dict into a resource instance.
+        """
+        resource_class = ResourceRegistry.get(body['apiVersion'], body['kind'])
+        return resource_class.parse_obj(body)
+
+
     def __init_subclass__(cls, /, group, version, kind=None,
             scope='Namespaced', status_subresource=False,
             served=True, storage=True, **kwargs):
