@@ -60,7 +60,7 @@ def all_crds(include_private=False):
     """
     crds = {}
     for resource_class in ResourceRegistry.iter_resources():
-        print(f'resource_class: {resource_class}')
+        #print(f'resource_class: {resource_class}')
         if include_private or not resource_class.__name__.startswith('_'):
             if not resource_class.__fqname__ in crds:
                 crds[resource_class.__fqname__] = as_crd(resource_class)
