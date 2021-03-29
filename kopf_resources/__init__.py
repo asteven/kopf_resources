@@ -9,11 +9,6 @@ from .resources import (
     Status,
 )
 
-from .cache import (
-    ResourceCache,
-    ResourceNotFound,
-)
-
 
 
 def from_dict(body):
