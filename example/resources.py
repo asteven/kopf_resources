@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from pydantic.typing import Any, Dict, Literal, List, Mapping, Type
 
 
+import kopf_resources
 from kopf_resources import Resource, Spec, Status
 
 
@@ -71,21 +72,10 @@ class HostCertificateV1alpha2(Resource, kind='HostCertificate', group='ssh-cert-
 
 
 
-
-
-def get_subclasses(cls):
-    for subclass in cls.__subclasses__():
-        yield from get_subclasses(subclass)
-        yield subclass
-
-
 def print_crds():
-    crds = {}
-    for _class in get_subclasses(Resource):
-        if not _class.__name__.startswith('_'):
-            if not _class.__fqname__ in crds:
-                crds[_class.__fqname__] = _class.as_crd()
-    print(yaml.dump_all(crds.values(), sort_keys=False))
+    crds = kopf_resources.all_crds()
+    print(yaml.dump_all(crds, sort_keys=False))
+
 
 
 if __name__ == '__main__':
