@@ -165,17 +165,18 @@ def _clean_schema(schema):
     }
     ```
     """
-    if 'allOf' in schema:
-        value = schema['allOf']
-        if len(value) == 1:
-            child = value[0]
-            for k,v in child.items():
-                schema.setdefault(k, v)
-            schema.pop('allOf')
-    else:
-        if isinstance(schema, dict):
-            for k,v in schema.items():
-                _clean_schema(v)
-        elif isinstance(schema, list):
-            for i,d in enumerate(schema):
-                _clean_schema(d)
+    if hasattr(schema, 'items'):
+        if 'allOf' in schema:
+            value = schema['allOf']
+            if len(value) == 1:
+                child = value[0]
+                for k,v in child.items():
+                    schema.setdefault(k, v)
+                schema.pop('allOf')
+        else:
+            if isinstance(schema, dict):
+                for k,v in schema.items():
+                    _clean_schema(v)
+            elif isinstance(schema, list):
+                for i,d in enumerate(schema):
+                    _clean_schema(d)
