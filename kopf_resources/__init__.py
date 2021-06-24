@@ -75,6 +75,16 @@ def as_crd(resource_class):
         if resource_class.__status_subresource__:
             _version.setdefault('subresources', {})
             _version['subresources']['status'] = {}
+            # Seen this in some kubebuilder generated CRDs.
+            # Not sure it is needed.
+            #body['status'] = {
+            #    'acceptedNames': {
+            #      'kind': '',
+            #      'plural': '',
+            #    },
+            #    'conditions': [],
+            #    'storedVersions': [],
+            #}
 
         body['spec']['versions'].append(_version)
 
@@ -165,14 +175,18 @@ def _clean_schema(schema):
     }
     ```
     """
+    #print(f'### _clean_schema: {schema}')
     if hasattr(schema, 'items'):
         if 'allOf' in schema:
+            #print(f'### _clean_schema allOf detected: {schema}')
             value = schema['allOf']
+            #print(f'### _clean_schema value: {value}')
             if len(value) == 1:
                 child = value[0]
                 for k,v in child.items():
                     schema.setdefault(k, v)
                 schema.pop('allOf')
+            _clean_schema(schema)
         else:
             if isinstance(schema, dict):
                 for k,v in schema.items():
